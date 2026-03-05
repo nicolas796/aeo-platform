@@ -15,25 +15,36 @@ class OnboardingService:
     def _run_onboarding(self, tenant_id: int):
         """Run the full onboarding sequence"""
         from flask import current_app
+        import traceback
+        
         app = current_app._get_current_object()
         
         with app.app_context():
             tenant = Tenant.query.get(tenant_id)
             if not tenant:
+                print(f"Onboarding: Tenant {tenant_id} not found")
                 return
+            
+            print(f"Onboarding: Starting for tenant {tenant_id} ({tenant.name})")
             
             try:
                 # Step 1: Auto-discover keywords from website
+                print(f"Onboarding: Step 1 - Discovering keywords...")
                 self._discover_keywords(tenant)
                 
                 # Step 2: Add common competitors based on industry
+                print(f"Onboarding: Step 2 - Adding competitors...")
                 self._add_default_competitors(tenant)
                 
                 # Step 3: Run initial scan
+                print(f"Onboarding: Step 3 - Running initial scan...")
                 self._run_initial_scan(tenant)
+                
+                print(f"Onboarding: Completed for tenant {tenant_id}")
                 
             except Exception as e:
                 print(f"Onboarding error for tenant {tenant_id}: {e}")
+                print(traceback.format_exc())
     
     def _discover_keywords(self, tenant: Tenant):
         """Discover keywords from the tenant's website"""
@@ -43,7 +54,9 @@ class OnboardingService:
             keywords = service.discover_keywords(tenant.id)
             print(f"Onboarding: Discovered {len(keywords)} keywords for {tenant.name}")
         except Exception as e:
+            import traceback
             print(f"Onboarding: Keyword discovery failed: {e}")
+            print(traceback.format_exc())
             # Add fallback generic keywords
             self._add_fallback_keywords(tenant)
     

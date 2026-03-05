@@ -50,3 +50,34 @@ def delete(id):
     
     flash('Competitor removed', 'success')
     return redirect(url_for('competitors.index'))
+
+
+@competitors_bp.route('/<int:id>/analyze', methods=['POST'])
+@login_required
+def analyze(id):
+    """Analyze competitor and generate comparison keywords"""
+    tenant_id = current_user.tenant_id
+    competitor = Competitor.query.filter_by(id=id, tenant_id=tenant_id).first_or_404()
+    
+    from app.services.competitor_research import CompetitorResearchService
+    service = CompetitorResearchService()
+    
+    try:
+        # Run full analysis
+        result = service.analyze_competitor(id)
+        
+        if result.get('status') == 'success':
+            # Save suggested keywords
+            keywords = result.get('suggested_keywords', [])
+            added = service.save_competitor_keywords(id, keywords)
+            
+            gaps_count = len(result.get('content_gaps', []))
+            
+            flash(f'Analysis complete! Added {added} comparison keywords. Found {gaps_count} content gaps.', 'success')
+        else:
+            flash(f"Analysis failed: {result.get('error', 'Unknown error')}", 'error')
+            
+    except Exception as e:
+        flash(f'Error analyzing competitor: {str(e)}', 'error')
+    
+    return redirect(url_for('competitors.index'))

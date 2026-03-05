@@ -10,7 +10,8 @@ class EmailService:
     """Send content via SendGrid email"""
 
     def __init__(self):
-        self.api_key = current_app.config.get('SENDGRID_API_KEY') or os.environ.get('SENDGRID_API_KEY')
+        api_key = current_app.config.get('SENDGRID_API_KEY') or os.environ.get('SENDGRID_API_KEY')
+        self.api_key = api_key.strip() if api_key else None
         self.from_email = current_app.config.get('SENDGRID_FROM_EMAIL', 'noreply@aeoplatform.local')
         self.client = None
         if self.api_key:
@@ -59,11 +60,33 @@ class EmailService:
 
             html_content = "\n".join(body_lines)
 
+            # Build plain text version for deliverability
+            plain_lines = [
+                content.title,
+                "",
+                "Please review the attached content.",
+            ]
+            if message:
+                plain_lines.extend(["", f"Message: {message}"])
+            preview = content.content[:2000]
+            plain_lines.extend([
+                "",
+                f"Word Count: {content.word_count}",
+                f"SEO Keyphrase: {content.seo_keyphrase or 'N/A'}",
+                "",
+                "--- Content Preview ---",
+                preview,
+                "",
+                "Sent from AEO Platform",
+            ])
+            plain_text = "\n".join(plain_lines)
+
             # Create email
             mail = Mail(
                 from_email=self.from_email,
                 to_emails=to_email,
                 subject=subject,
+                plain_text_content=plain_text,
                 html_content=html_content
             )
 
@@ -165,7 +188,8 @@ class EmailService:
             import traceback
             print(f"SendGrid error: {e}")
             print(traceback.format_exc())
-            return False, str(e)
+            error_msg = self._extract_error(e)
+            return False, error_msg
 
     def send_weekly_report_email(self, to_email, user, report, content_suggestions, dashboard_url):
         """Send weekly AEO report to team member
@@ -334,10 +358,12 @@ AEO Platform
 
                 <p>AEO Platform helps brands optimize their visibility in AI-powered search engines.</p>
 
-                <div style="margin: 30px 0; padding: 20px; background-color: #f3f4f6; border-radius: 8px;">
-                    <p style="margin: 0; font-weight: bold;">To accept this invitation:</p>
-                    <p style="margin: 10px 0 0 0;">Contact {inviter.first_name} {inviter.last_name} at {inviter.email} for your invitation link.</p>
+                <div style="margin: 30px 0; text-align: center;">
+                    <a href="{invite_url}" style="display: inline-block; padding: 14px 32px; background-color: #4F46E5; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: bold;">Accept Invitation</a>
                 </div>
+
+                <p style="color: #666; font-size: 13px;">Or copy and paste this link into your browser:<br>
+                <a href="{invite_url}" style="color: #4F46E5;">{invite_url}</a></p>
 
                 <p style="color: #666; font-size: 14px; margin-top: 30px;">
                     This invitation will expire in 7 days.<br>
@@ -351,7 +377,8 @@ AEO Platform
 
 {inviter.first_name} {inviter.last_name} has invited you to join their team.
 
-To accept this invitation, contact {inviter.first_name} at {inviter.email} for your invitation link.
+To accept this invitation, visit the following link:
+{invite_url}
 
 This invitation will expire in 7 days.
 
@@ -376,4 +403,21 @@ If you didn't expect this invitation, you can ignore this email.
                 return False, f"SendGrid returned status {response.status_code}"
 
         except Exception as e:
-            return False, str(e)
+            import traceback
+            print(f"SendGrid invitation error: {e}")
+            print(traceback.format_exc())
+            error_msg = self._extract_error(e)
+            return False, error_msg
+
+    @staticmethod
+    def _extract_error(e):
+        """Extract detailed error message from SendGrid API exceptions."""
+        status = getattr(e, 'status_code', None)
+        body = getattr(e, 'body', None)
+        if status and body:
+            try:
+                body_str = body.decode('utf-8') if isinstance(body, bytes) else str(body)
+            except Exception:
+                body_str = str(body)
+            return f"HTTP {status}: {body_str}"
+        return str(e)

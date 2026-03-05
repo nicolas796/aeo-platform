@@ -150,9 +150,30 @@ class ReportGenerator:
         return recommendations
     
     def _generate_content_suggestions(self, tenant_id: int, needing_attention: List[Dict]):
-        """Generate content suggestions for keywords needing attention"""
+        """Generate fresh content suggestions based on latest scan results"""
         
-        for keyword_data in needing_attention[:5]:  # Top 5 opportunities
+        # Clear old pending suggestions - we want fresh recommendations after each scan
+        old_suggestions = ContentSuggestion.query.filter_by(
+            tenant_id=tenant_id, 
+            status='pending'
+        ).all()
+        
+        for old in old_suggestions:
+            db.session.delete(old)
+        
+        # Sort by opportunity level (high = not mentioned, medium = mentioned not cited)
+        priority_order = {'not_mentioned': 0, 'mentioned_not_cited': 1}
+        sorted_needs = sorted(
+            needing_attention, 
+            key=lambda x: priority_order.get(x.get('issue'), 2)
+        )
+        
+        # Generate new suggestions for top priorities (max 5)
+        generated = 0
+        for keyword_data in sorted_needs[:5]:
+            if generated >= 5:
+                break
+                
             keyword_id = keyword_data.get('keyword_id')
             if not keyword_id:
                 continue
@@ -161,42 +182,57 @@ class ReportGenerator:
             if not keyword:
                 continue
             
-            # Check if suggestion already exists
-            existing = ContentSuggestion.query.filter_by(keyword_id=keyword_id, status='pending').first()
-            if existing:
+            # Skip if already has an approved/generated article
+            existing_created = ContentSuggestion.query.filter_by(
+                keyword_id=keyword_id, 
+                status='created'
+            ).first()
+            if existing_created:
                 continue
             
-            # Generate suggestion
-            title = f"How to Answer: {keyword.prompt_text}"
+            # Determine priority and focus based on issue type
+            issue = keyword_data.get('issue', 'not_mentioned')
+            priority_score = keyword.priority_score if keyword else 3.0
+            
+            if issue == 'not_mentioned':
+                # High priority: Brand not mentioned at all
+                title = f"How to Answer: {keyword.prompt_text}"
+                unique_angle = f"Create comprehensive, authoritative content that directly answers '{keyword.prompt_text}' with specific insights about {keyword.tenant.name if keyword.tenant else 'your solution'}. Focus on being the most quotable source."
+                target_words = 2000
+            else:
+                # Medium priority: Mentioned but not cited
+                title = f"Why {keyword.tenant.name if keyword.tenant else 'We'} Are the Best Choice for {keyword.prompt_text}"
+                unique_angle = f"Refresh existing mentions by adding unique data, frameworks, and quotable insights about {keyword.prompt_text} that AI assistants will want to cite."
+                target_words = 1500
             
             outline = json.dumps([
-                {"heading": "Introduction", "content": "Direct answer to the prompt"},
-                {"heading": "Key Considerations", "content": "What factors matter most"},
-                {"heading": "Best Practices", "content": "Actionable recommendations"},
-                {"heading": "Common Mistakes", "content": "What to avoid"},
-                {"heading": "Conclusion", "content": "Summary and next steps"}
+                {"heading": "Direct Answer", "content": "Clear 1-2 sentence answer that AI can quote"},
+                {"heading": "Key Considerations", "content": "What factors matter most for this question"},
+                {"heading": "Best Practices", "content": "Actionable recommendations with examples"},
+                {"heading": "Data & Insights", "content": "Specific statistics, frameworks, or unique perspectives"},
+                {"heading": "Conclusion", "content": "Summary with clear takeaway"}
             ])
             
             key_points = json.dumps([
-                "Lead with a clear, quotable answer",
-                "Include specific examples and data",
-                "Address related sub-questions",
-                "Use descriptive headings"
+                "Lead with a quotable 1-2 sentence answer",
+                "Include specific data or unique frameworks",
+                "Address what competitors miss",
+                "Make it citation-worthy with clear insights"
             ])
-            
-            unique_angle = f"Create the definitive guide for '{keyword.prompt_text}' with original insights and specific examples that AI assistants will want to cite."
             
             suggestion = ContentSuggestion(
                 tenant_id=tenant_id,
                 keyword_id=keyword_id,
                 title=title,
                 outline=outline,
-                target_word_count=1500,
+                target_word_count=target_words,
                 key_points=key_points,
                 unique_angle=unique_angle,
                 status='pending'
             )
             
             db.session.add(suggestion)
+            generated += 1
         
         db.session.commit()
+        print(f"Generated {generated} fresh content suggestions based on scan results")

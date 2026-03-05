@@ -10,7 +10,8 @@ class EmailService:
     """Send content via SendGrid email"""
 
     def __init__(self):
-        self.api_key = current_app.config.get('SENDGRID_API_KEY') or os.environ.get('SENDGRID_API_KEY')
+        api_key = current_app.config.get('SENDGRID_API_KEY') or os.environ.get('SENDGRID_API_KEY')
+        self.api_key = api_key.strip() if api_key else None
         self.from_email = current_app.config.get('SENDGRID_FROM_EMAIL', 'noreply@aeoplatform.local')
         self.client = None
         if self.api_key:
@@ -192,10 +193,12 @@ class EmailService:
 
                 <p>AEO Platform helps brands optimize their visibility in AI-powered search engines.</p>
 
-                <div style="margin: 30px 0; padding: 20px; background-color: #f3f4f6; border-radius: 8px;">
-                    <p style="margin: 0; font-weight: bold;">To accept this invitation:</p>
-                    <p style="margin: 10px 0 0 0;">Contact {inviter.first_name} {inviter.last_name} at {inviter.email} for your invitation link.</p>
+                <div style="margin: 30px 0; text-align: center;">
+                    <a href="{invite_url}" style="display: inline-block; padding: 14px 32px; background-color: #4F46E5; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: bold;">Accept Invitation</a>
                 </div>
+
+                <p style="color: #666; font-size: 13px;">Or copy and paste this link into your browser:<br>
+                <a href="{invite_url}" style="color: #4F46E5;">{invite_url}</a></p>
 
                 <p style="color: #666; font-size: 14px; margin-top: 30px;">
                     This invitation will expire in 7 days.<br>
@@ -209,7 +212,8 @@ class EmailService:
 
 {inviter.first_name} {inviter.last_name} has invited you to join their team.
 
-To accept this invitation, contact {inviter.first_name} at {inviter.email} for your invitation link.
+To accept this invitation, visit the following link:
+{invite_url}
 
 This invitation will expire in 7 days.
 

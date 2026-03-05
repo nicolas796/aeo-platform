@@ -47,49 +47,14 @@ class OnboardingService:
                 print(traceback.format_exc())
     
     def _discover_keywords(self, tenant: Tenant):
-        """Discover keywords from the tenant's website"""
+        """Discover keywords from the tenant's website - must succeed"""
         service = KeywordResearchService()
         
-        try:
-            keywords = service.discover_keywords(tenant.id)
-            print(f"Onboarding: Discovered {len(keywords)} keywords for {tenant.name}")
-        except Exception as e:
-            import traceback
-            print(f"Onboarding: Keyword discovery failed: {e}")
-            print(traceback.format_exc())
-            # Add fallback generic keywords
-            self._add_fallback_keywords(tenant)
-    
-    def _add_fallback_keywords(self, tenant: Tenant):
-        """Add generic keywords if website crawl fails"""
-        company_name = tenant.name
+        keywords = service.discover_keywords(tenant.id)
+        if not keywords:
+            raise ValueError(f"No keywords discovered for {tenant.name}. Please check the website URL.")
         
-        fallback_prompts = [
-            f"What is {company_name}?",
-            f"How does {company_name} work?",
-            f"{company_name} reviews",
-            f"Best alternatives to {company_name}",
-            f"Is {company_name} worth it?",
-            f"{company_name} pricing",
-        ]
-        
-        for prompt_text in fallback_prompts:
-            existing = Keyword.query.filter_by(tenant_id=tenant.id, prompt_text=prompt_text).first()
-            if not existing:
-                keyword = Keyword(
-                    tenant_id=tenant.id,
-                    prompt_text=prompt_text,
-                    category='general',
-                    relevance_score=4.0,
-                    volume_score=3.5,
-                    winability_score=3.0,
-                    intent_score=4.0
-                )
-                keyword.calculate_priority()
-                db.session.add(keyword)
-        
-        db.session.commit()
-        print(f"Onboarding: Added {len(fallback_prompts)} fallback keywords for {tenant.name}")
+        print(f"Onboarding: Discovered {len(keywords)} keywords for {tenant.name}")
     
     def _add_default_competitors(self, tenant: Tenant):
         """Discover competitors from website or leave empty for user to add"""

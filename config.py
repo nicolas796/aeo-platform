@@ -13,7 +13,7 @@ class Config:
     # API Keys (load from env)
     GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
     BRAVE_API_KEY = os.environ.get('BRAVE_API_KEY')
-    SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY')
+    SENDGRID_API_KEY = (os.environ.get('SENDGRID_API_KEY') or '').strip() or None
     SENDGRID_FROM_EMAIL = os.environ.get('SENDGRID_FROM_EMAIL', 'noreply@aeoplatform.local')
     
     # Scheduling

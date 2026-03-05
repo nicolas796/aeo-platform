@@ -16,6 +16,9 @@ class Config:
     SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY')
     SENDGRID_FROM_EMAIL = os.environ.get('SENDGRID_FROM_EMAIL', 'noreply@aeoplatform.local')
     
+    # App URL for emails
+    BASE_URL = os.environ.get('BASE_URL', 'https://aeo-platform.onrender.com')
+    
     # Scheduling
     WEEKLY_SCAN_DAY = os.environ.get('WEEKLY_SCAN_DAY', 'sunday')  # Day to run weekly scans
     WEEKLY_SCAN_TIME = os.environ.get('WEEKLY_SCAN_TIME', '02:00')  # Time to run (24h format)

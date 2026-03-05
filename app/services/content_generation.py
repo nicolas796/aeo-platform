@@ -4,13 +4,14 @@ import os
 import subprocess
 from typing import Dict, List
 from datetime import datetime
+from flask import current_app
 from app.models import db, ContentSuggestion, GeneratedContent
 
 class ContentGenerationService:
     """Generate AEO-optimized content from approved suggestions"""
 
     def __init__(self):
-        self.gemini_api_key = "AIzaSyAMdj8VV9Gv12uvI49QIaB6XewnZcyxrd4"
+        self.gemini_api_key = os.environ.get('GEMINI_API_KEY') or current_app.config.get('GEMINI_API_KEY')
 
     def generate_content(self, suggestion_id: int) -> GeneratedContent:
         """Generate full article from an approved content suggestion"""

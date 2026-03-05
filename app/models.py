@@ -434,7 +434,7 @@ class CreditTransaction(db.Model):
     cost_per_unit = db.Column(db.Integer, default=0)
     total_cost = db.Column(db.Integer, default=0)  # Negative = credit added
     description = db.Column(db.String(255))
-    metadata = db.Column(db.Text)  # JSON string for extra data
+    meta_data = db.Column(db.Text)  # JSON string for extra data
     balance_after = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
@@ -449,7 +449,7 @@ class CreditTransaction(db.Model):
             'quantity': self.quantity,
             'total_cost': self.total_cost,
             'description': self.description,
-            'metadata': json.loads(self.metadata) if self.metadata else {},
+            'metadata': json.loads(self.meta_data) if self.meta_data else {},
             'balance_after': self.balance_after,
             'created_at': self.created_at.isoformat()
         }

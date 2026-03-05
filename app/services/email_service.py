@@ -166,7 +166,8 @@ class EmailService:
             import traceback
             print(f"SendGrid error: {e}")
             print(traceback.format_exc())
-            return False, str(e)
+            error_msg = self._extract_error(e)
+            return False, error_msg
 
     def send_invitation_email(self, to_email, inviter, invite_url):
         """Send team invitation email
@@ -238,4 +239,21 @@ If you didn't expect this invitation, you can ignore this email.
                 return False, f"SendGrid returned status {response.status_code}"
 
         except Exception as e:
-            return False, str(e)
+            import traceback
+            print(f"SendGrid invitation error: {e}")
+            print(traceback.format_exc())
+            error_msg = self._extract_error(e)
+            return False, error_msg
+
+    @staticmethod
+    def _extract_error(e):
+        """Extract detailed error message from SendGrid API exceptions."""
+        status = getattr(e, 'status_code', None)
+        body = getattr(e, 'body', None)
+        if status and body:
+            try:
+                body_str = body.decode('utf-8') if isinstance(body, bytes) else str(body)
+            except Exception:
+                body_str = str(body)
+            return f"HTTP {status}: {body_str}"
+        return str(e)

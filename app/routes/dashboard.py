@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, jsonify, current_app
+from flask import Blueprint, render_template, jsonify, current_app, flash, redirect, url_for
 from flask_login import login_required, current_user
 from app.models import Keyword, Scan, WeeklyReport, Competitor
 from sqlalchemy import func
@@ -92,3 +92,15 @@ def api_stats():
         'priority_distribution': priority_dist,
         'total_keywords': len(keywords)
     })
+
+@dashboard_bp.route('/onboard', methods=['POST'])
+@login_required
+def run_onboarding():
+    """Manually trigger onboarding for the current tenant"""
+    from app.services.onboarding import OnboardingService
+    
+    service = OnboardingService()
+    service.start_onboarding(current_user.tenant_id)
+    
+    flash('Onboarding started! Keywords are being discovered from your website.', 'success')
+    return redirect(url_for('dashboard.index'))

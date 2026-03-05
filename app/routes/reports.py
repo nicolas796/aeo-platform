@@ -1,13 +1,15 @@
-from flask import Blueprint, render_template, jsonify, request, redirect, url_for, flash, send_file
+from flask import Blueprint, render_template, jsonify, request, redirect, url_for, flash, send_file, current_app
 from flask_login import login_required, current_user
-from app.models import db, WeeklyReport, ContentSuggestion, GeneratedContent
+from app.models import db, WeeklyReport, ContentSuggestion, GeneratedContent, ContentShare
 from app.services.content_generation import ContentGenerationService
+from datetime import datetime, timedelta
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import markdown
 import re
 import io
+import secrets
 
 reports_bp = Blueprint('reports', __name__)
 
@@ -155,30 +157,44 @@ def update_content(id):
 @reports_bp.route('/content/<int:id>/send', methods=['POST'])
 @login_required
 def send_content_email(id):
-    """Send content via email for review"""
+    """Send content teaser email with share link"""
     tenant_id = current_user.tenant_id
     content = GeneratedContent.query.filter_by(id=id, tenant_id=tenant_id).first_or_404()
 
     to_email = request.form.get('to_email')
     message = request.form.get('message', '')
-    include_word = request.form.get('include_word') == 'on'
-    include_thumbnail = request.form.get('include_thumbnail') == 'on'
 
     if not to_email:
         flash('Please provide an email address.', 'error')
         return redirect(url_for('reports.edit_content', id=id))
+
+    # Create a share link (expires in 30 days)
+    token = secrets.token_urlsafe(32)
+    share = ContentShare(
+        content_id=content.id,
+        shared_by=current_user.id,
+        token=token,
+        recipient_email=to_email,
+        expires_at=datetime.utcnow() + timedelta(days=30)
+    )
+    db.session.add(share)
+    db.session.commit()
+
+    app_url = current_app.config.get('APP_URL')
+    share_path = url_for('reports.view_shared_content', token=token)
+    share_url = f"{app_url}{share_path}" if app_url else url_for('reports.view_shared_content', token=token, _external=True)
 
     from app.services.email_service import EmailService
     service = EmailService()
     success, error = service.send_content_for_review(
         to_email=to_email,
         content=content,
-        message=message,
-        include_word=include_word,
-        include_thumbnail=include_thumbnail
+        share_url=share_url,
+        sender_name=f"{current_user.first_name} {current_user.last_name}",
+        message=message
     )
     if success:
-        flash(f'Content sent to {to_email} for review!', 'success')
+        flash(f'Content shared with {to_email}!', 'success')
     else:
         flash(f'Failed to send email: {error}', 'error')
 
@@ -308,3 +324,19 @@ def export_word(id):
         as_attachment=True,
         download_name=filename
     )
+
+
+@reports_bp.route('/shared/<token>')
+def view_shared_content(token):
+    """Public page to view shared content (no login required)"""
+    share = ContentShare.query.filter_by(token=token).first()
+
+    if not share or share.is_expired():
+        flash('This share link is invalid or has expired.', 'error')
+        return redirect(url_for('auth.login'))
+
+    content = share.content
+    html_body = markdown.markdown(content.content, extensions=['tables', 'fenced_code'])
+
+    return render_template('reports/shared_content.html',
+                           content=content, html_body=html_body, share=share)

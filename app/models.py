@@ -401,3 +401,22 @@ class Invitation(db.Model):
     
     def __repr__(self):
         return f'<Invitation {self.email} - {self.status}>'
+
+
+class ContentShare(db.Model):
+    """Shareable links for generated content"""
+    __tablename__ = 'content_shares'
+
+    id = db.Column(db.Integer, primary_key=True)
+    content_id = db.Column(db.Integer, db.ForeignKey('generated_content.id'), nullable=False)
+    shared_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    token = db.Column(db.String(100), unique=True, nullable=False)
+    recipient_email = db.Column(db.String(120))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=False)
+
+    content = db.relationship('GeneratedContent', backref='shares')
+    sharer = db.relationship('User', foreign_keys=[shared_by])
+
+    def is_expired(self):
+        return datetime.utcnow() > self.expires_at

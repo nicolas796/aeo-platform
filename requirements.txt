@@ -1,0 +1,12 @@
+flask
+flask-sqlalchemy
+flask-login
+flask-wtf
+werkzeug
+apscheduler
+requests
+python-dotenv
+email-validator
+python-docx
+markdown
+sendgrid

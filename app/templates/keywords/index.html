@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Keywords - AEO Platform{% endblock %}
+
+{% block content %}
+<div class="mb-8 flex justify-between items-center">
+    <div>
+        <h1 class="text-3xl font-bold text-gray-900">Keywords</h1>
+        <p class="text-gray-600">Manage the prompts and questions you want to track</p>
+    </div>
+    <form method="POST" action="{{ url_for('keywords.discover') }}" class="inline">
+        <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
+            <i class="fas fa-magic mr-2"></i>Auto-discover from website
+        </button>
+    </form>
+</div>
+
+<!-- Add Keyword Form -->
+<div class="bg-white rounded-xl shadow-sm p-6 mb-8">
+    <h3 class="text-lg font-semibold text-gray-900 mb-4">Add New Keyword</h3>
+    <form method="POST" action="{{ url_for('keywords.add') }}" class="flex gap-4">
+        <div class="flex-1">
+            <input type="text" name="prompt_text" placeholder="Enter a question or prompt people ask AI assistants..." required
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+            <select name="category" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="">Category...</option>
+                <option value="problem-aware">Problem Aware</option>
+                <option value="solution-aware">Solution Aware</option>
+                <option value="comparison">Comparison</option>
+                <option value="best-of">Best Of</option>
+                <option value="how-to">How To</option>
+                <option value="evaluation">Evaluation</option>
+            </select>
+        </div>
+        <button type="submit" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">
+            <i class="fas fa-plus mr-2"></i>Add
+        </button>
+    </form>
+</div>
+
+<!-- Keywords List -->
+<div class="bg-white rounded-xl shadow-sm overflow-hidden">
+    <table class="w-full">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Keyword / Prompt</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+            {% for keyword in keywords %}
+            <tr>
+                <td class="px-6 py-4">
+                    <p class="text-sm font-medium text-gray-900">{{ keyword.prompt_text }}</p>
+                </td>
+                <td class="px-6 py-4">
+                    <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700">
+                        {{ keyword.category or 'General' }}
+                    </span>
+                </td>
+                <td class="px-6 py-4">
+                    <div class="flex items-center">
+                        <div class="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                            <div class="bg-indigo-600 h-2 rounded-full" style="width: {{ (keyword.priority_score / 5 * 100)|int }}%"></div>
+                        </div>
+                        <span class="text-sm text-gray-600">{{ "%.1f"|format(keyword.priority_score) }}</span>
+                    </div>
+                </td>
+                <td class="px-6 py-4">
+                    <form method="POST" action="{{ url_for('keywords.delete', id=keyword.id) }}" class="inline" onsubmit="return confirm('Remove this keyword?')">
+                        <button type="submit" class="text-red-600 hover:text-red-800">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="4" class="px-6 py-8 text-center text-gray-500">
+                    No keywords yet. Add your first keyword above or use auto-discover.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - AEO Platform{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <h1 class="text-3xl font-bold text-gray-900">Dashboard</h1>
+    <p class="text-gray-600">Overview of {{ tenant.name }}'s AEO performance</p>
+</div>
+
+<!-- Stats Cards -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+    <!-- Keywords Card -->
+    <div class="bg-white rounded-xl shadow-sm p-6">
+        <div class="flex items-center">
+            <div class="p-3 rounded-lg bg-indigo-100 text-indigo-600">
+                <i class="fas fa-key text-xl"></i>
+            </div>
+            <div class="ml-4">
+                <p class="text-sm font-medium text-gray-600">Keywords Tracked</p>
+                <p class="text-2xl font-bold text-gray-900">{{ total_keywords }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mention Rate Card -->
+    <div class="bg-white rounded-xl shadow-sm p-6">
+        <div class="flex items-center">
+            <div class="p-3 rounded-lg bg-green-100 text-green-600">
+                <i class="fas fa-bullseye text-xl"></i>
+            </div>
+            <div class="ml-4">
+                <p class="text-sm font-medium text-gray-600">Mention Rate</p>
+                <p class="text-2xl font-bold text-gray-900">{{ "%.1f"|format(mention_rate) }}%</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Citation Rate Card -->
+    <div class="bg-white rounded-xl shadow-sm p-6">
+        <div class="flex items-center">
+            <div class="p-3 rounded-lg bg-blue-100 text-blue-600">
+                <i class="fas fa-link text-xl"></i>
+            </div>
+            <div class="ml-4">
+                <p class="text-sm font-medium text-gray-600">Citation Rate</p>
+                <p class="text-2xl font-bold text-gray-900">{{ "%.1f"|format(citation_rate) }}%</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scan Status Card -->
+    <div class="bg-white rounded-xl shadow-sm p-6">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center">
+                <div class="p-3 rounded-lg bg-orange-100 text-orange-600">
+                    <i class="fas fa-radar text-xl"></i>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-600">Last Scan</p>
+                    {% if latest_scan %}
+                    <p class="text-lg font-bold text-gray-900">{{ latest_scan.scan_date.strftime('%b %d') }}</p>
+                    <p class="text-xs text-gray-500">{{ latest_scan.status.title() }}</p>
+                    {% else %}
+                    <p class="text-lg font-bold text-gray-900">Never</p>
+                    {% endif %}
+                </div>
+            </div>
+            <form method="POST" action="{{ url_for('scans.run_scan') }}" class="ml-4">
+                <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors" {% if latest_scan and latest_scan.status == 'running' %}disabled class="bg-gray-400 cursor-not-allowed"{% endif %}>
+                    {% if latest_scan and latest_scan.status == 'running' %}
+                    <i class="fas fa-spinner fa-spin mr-1"></i> Running...
+                    {% else %}
+                    <i class="fas fa-play mr-1"></i> Run Scan
+                    {% endif %}
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <!-- Trend Chart -->
+    <div class="bg-white rounded-xl shadow-sm p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Visibility Trends</h3>
+        <canvas id="trendChart" height="200"></canvas>
+    </div>
+    
+    <!-- Priority Distribution -->
+    <div class="bg-white rounded-xl shadow-sm p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Keyword Priority Distribution</h3>
+        <canvas id="priorityChart" height="200"></canvas>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Latest Scan -->
+    <div class="bg-white rounded-xl shadow-sm p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">
+            <i class="fas fa-radar text-indigo-600 mr-2"></i>Scan Status
+        </h3>
+        {% if latest_scan %}
+        <div class="space-y-3">
+            <div class="flex justify-between items-center">
+                <span class="text-gray-600">Last Scan:</span>
+                <span class="font-medium">{{ latest_scan.scan_date.strftime('%b %d, %Y at %H:%M') }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+                <span class="text-gray-600">Status:</span>
+                <span class="px-2 py-1 rounded-full text-xs font-medium 
+                    {% if latest_scan.status == 'completed' %}bg-green-100 text-green-800
+                    {% elif latest_scan.status == 'running' %}bg-yellow-100 text-yellow-800
+                    {% elif latest_scan.status == 'failed' %}bg-red-100 text-red-800
+                    {% else %}bg-gray-100 text-gray-800{% endif %}">
+                    {{ latest_scan.status.title() }}
+                </span>
+            </div>
+            <div class="flex justify-between items-center">
+                <span class="text-gray-600">Progress:</span>
+                <span class="font-medium">{{ latest_scan.completed_keywords }} / {{ latest_scan.total_keywords }} keywords</span>
+            </div>
+            {% if next_scan %}
+            <div class="flex justify-between items-center pt-2 border-t">
+                <span class="text-gray-600"><i class="fas fa-calendar-alt mr-1"></i>Next Scheduled:</span>
+                <span class="font-medium text-indigo-600">{{ next_scan.strftime('%b %d, %Y at %H:%M') }}</span>
+            </div>
+            {% endif %}
+            <a href="{{ url_for('scans.detail', id=latest_scan.id) }}" class="inline-flex items-center text-indigo-600 hover:text-indigo-800 mt-2">
+                View details <i class="fas fa-arrow-right ml-2 text-sm"></i>
+            </a>
+        </div>
+        {% else %}
+        <p class="text-gray-500">No scans yet. <a href="{{ url_for('scans.index') }}" class="text-indigo-600">Run your first scan</a></p>
+        {% endif %}
+    </div>
+    
+    <!-- Latest Report -->
+    <div class="bg-white rounded-xl shadow-sm p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Latest Report</h3>
+        {% if latest_report %}
+        <div class="space-y-3">
+            <div class="flex justify-between">
+                <span class="text-gray-600">Date:</span>
+                <span class="font-medium">{{ latest_report.report_date.strftime('%Y-%m-%d') }}</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-600">Mention Rate:</span>
+                <span class="font-medium">{{ "%.1f"|format(latest_report.mention_rate) }}%</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-600">Citation Rate:</span>
+                <span class="font-medium">{{ "%.1f"|format(latest_report.citation_rate) }}%</span>
+            </div>
+            <a href="{{ url_for('reports.detail', id=latest_report.id) }}" class="inline-flex items-center text-indigo-600 hover:text-indigo-800 mt-2">
+                View report <i class="fas fa-arrow-right ml-2 text-sm"></i>
+            </a>
+        </div>
+        {% else %}
+        <p class="text-gray-500">No reports yet. Reports are generated after scans complete.</p>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+// Load chart data from API
+fetch('/api/dashboard/stats')
+    .then(r => r.json())
+    .then(data => {
+        // Trend Chart
+        const trendCtx = document.getElementById('trendChart').getContext('2d');
+        new Chart(trendCtx, {
+            type: 'line',
+            data: {
+                labels: data.trend_data.labels,
+                datasets: [{
+                    label: 'Mention Rate (%)',
+                    data: data.trend_data.mention_rates,
+                    borderColor: 'rgb(79, 70, 229)',
+                    backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                    tension: 0.3
+                }, {
+                    label: 'Citation Rate (%)',
+                    data: data.trend_data.citation_rates,
+                    borderColor: 'rgb(16, 185, 129)',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
+        });
+        
+        // Priority Chart
+        const priorityCtx = document.getElementById('priorityChart').getContext('2d');
+        new Chart(priorityCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Tier 1 (High)', 'Tier 2 (Medium)', 'Tier 3 (Low)'],
+                datasets: [{
+                    data: [data.priority_distribution.tier1, data.priority_distribution.tier2, data.priority_distribution.tier3],
+                    backgroundColor: ['rgb(239, 68, 68)', 'rgb(245, 158, 11)', 'rgb(16, 185, 129)']
+                }]
+            },
+            options: {
+                responsive: true
+            }
+        });
+    })
+    .catch(err => {
+        console.error('Failed to load chart data:', err);
+        document.getElementById('trendChart').parentElement.innerHTML = '<p class="text-gray-500 text-center py-8">No data available yet</p>';
+        document.getElementById('priorityChart').parentElement.innerHTML = '<p class="text-gray-500 text-center py-8">No data available yet</p>';
+    });
+</script>
+{% endblock %}

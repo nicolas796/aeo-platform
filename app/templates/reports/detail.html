@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}Report - AEO Platform{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <a href="{{ url_for('reports.index') }}" class="text-indigo-600 hover:text-indigo-800 mb-2 inline-block">
+        <i class="fas fa-arrow-left mr-1"></i> Back to reports
+    </a>
+    <h1 class="text-3xl font-bold text-gray-900">Weekly Report</h1>
+    <p class="text-gray-600">{{ report.report_date.strftime('%B %d, %Y') }}</p>
+</div>
+
+<!-- Key Metrics -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+    <div class="bg-white rounded-xl shadow-sm p-6">
+        <p class="text-sm text-gray-600">Total Keywords</p>
+        <p class="text-3xl font-bold text-gray-900">{{ report.total_keywords }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-6">
+        <p class="text-sm text-gray-600">Mention Rate</p>
+        <p class="text-3xl font-bold {{ 'text-green-600' if report.mention_rate >= 50 else 'text-yellow-600' if report.mention_rate >= 30 else 'text-red-600' }}">
+            {{ "%.1f"|format(report.mention_rate) }}%
+        </p>
+        {% if report.mention_rate_change != 0 %}
+        <p class="text-sm {{ 'text-green-600' if report.mention_rate_change > 0 else 'text-red-600' }}">
+            <i class="fas fa-{{ 'arrow-up' if report.mention_rate_change > 0 else 'arrow-down' }}"></i>
+            {{ "%.1f"|format(report.mention_rate_change|abs) }}% vs last week
+        </p>
+        {% endif %}
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-6">
+        <p class="text-sm text-gray-600">Citation Rate</p>
+        <p class="text-3xl font-bold {{ 'text-green-600' if report.citation_rate >= 30 else 'text-yellow-600' if report.citation_rate >= 15 else 'text-red-600' }}">
+            {{ "%.1f"|format(report.citation_rate) }}%
+        </p>
+        {% if report.citation_rate_change != 0 %}
+        <p class="text-sm {{ 'text-green-600' if report.citation_rate_change > 0 else 'text-red-600' }}">
+            <i class="fas fa-{{ 'arrow-up' if report.citation_rate_change > 0 else 'arrow-down' }}"></i>
+            {{ "%.1f"|format(report.citation_rate_change|abs) }}% vs last week
+        </p>
+        {% endif %}
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-6">
+        <p class="text-sm text-gray-600">Visibility Score</p>
+        <p class="text-3xl font-bold text-indigo-600">
+            {{ "%.0f"|format((report.mention_rate + report.citation_rate) / 2) }}/100
+        </p>
+    </div>
+</div>
+
+<!-- Recommendations -->
+<div class="bg-white rounded-xl shadow-sm p-6 mb-8">
+    <h3 class="text-lg font-semibold text-gray-900 mb-4"><i class="fas fa-lightbulb text-yellow-500 mr-2"></i>Recommendations</h3>
+    <ul class="space-y-3">
+        {% for rec in report.get_recommendations() %}
+        <li class="flex items-start">
+            <i class="fas fa-chevron-right text-indigo-600 mt-1 mr-3"></i>
+            <span class="text-gray-700">{{ rec }}</span>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Top Performing -->
+    <div class="bg-white rounded-xl shadow-sm p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4"><i class="fas fa-trophy text-yellow-500 mr-2"></i>Top Performing Keywords</h3>
+        {% set top = report.get_top_performing() %}
+        {% if top %}
+        <ul class="space-y-2">
+            {% for kw in top %}
+            <li class="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-900">{{ kw.keyword_text[:60] }}...</span>
+                <span class="text-xs text-green-600"><i class="fas fa-check mr-1"></i>Mentioned + Cited</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-gray-500">No top performers yet. Keep building content!</p>
+        {% endif %}
+    </div>
+    
+    <!-- Needs Attention -->
+    <div class="bg-white rounded-xl shadow-sm p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4"><i class="fas fa-exclamation-triangle text-orange-500 mr-2"></i>Needs Attention</h3>
+        {% set attention = report.get_needing_attention() %}
+        {% if attention %}
+        <ul class="space-y-2">
+            {% for kw in attention %}
+            <li class="flex items-center justify-between p-3 {{ 'bg-red-50' if kw.opportunity == 'high' else 'bg-yellow-50' }} rounded-lg">
+                <span class="text-sm font-medium text-gray-900">{{ kw.keyword_text[:50] }}...</span>
+                <span class="text-xs {{ 'text-red-600' if kw.opportunity == 'high' else 'text-yellow-600' }}">
+                    {{ 'Not mentioned' if kw.issue == 'not_mentioned' else 'Not cited' }}
+                </span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-gray-500">All keywords are performing well!</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

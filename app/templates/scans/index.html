@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Scans - AEO Platform{% endblock %}
+
+{% block content %}
+<div class="mb-8 flex justify-between items-center">
+    <div>
+        <h1 class="text-3xl font-bold text-gray-900">Scans</h1>
+        <p class="text-gray-600">Run and view AEO visibility scans</p>
+    </div>
+    <form method="POST" action="{{ url_for('scans.run_scan') }}">
+        <button type="submit" class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700">
+            <i class="fas fa-play mr-2"></i>Run New Scan
+        </button>
+    </form>
+</div>
+
+<!-- Scans List -->
+<div class="bg-white rounded-xl shadow-sm overflow-hidden">
+    <table class="w-full">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Progress</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+            {% for scan in scans %}
+            <tr>
+                <td class="px-6 py-4">
+                    <p class="text-sm text-gray-900">{{ scan.scan_date.strftime('%Y-%m-%d %H:%M') }}</p>
+                </td>
+                <td class="px-6 py-4">
+                    <span class="px-2 py-1 text-xs rounded-full font-medium 
+                        {% if scan.status == 'completed' %}bg-green-100 text-green-800
+                        {% elif scan.status == 'running' %}bg-yellow-100 text-yellow-800
+                        {% elif scan.status == 'failed' %}bg-red-100 text-red-800
+                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                        {{ scan.status.title() }}
+                    </span>
+                </td>
+                <td class="px-6 py-4">
+                    <div class="flex items-center">
+                        <div class="w-24 bg-gray-200 rounded-full h-2 mr-2">
+                            <div class="bg-indigo-600 h-2 rounded-full transition-all" style="width: {{ scan.progress_percent }}%"></div>
+                        </div>
+                        <span class="text-sm text-gray-600">{{ scan.completed_keywords }}/{{ scan.total_keywords }}</span>
+                    </div>
+                </td>
+                <td class="px-6 py-4">
+                    <a href="{{ url_for('scans.detail', id=scan.id) }}" class="text-indigo-600 hover:text-indigo-800">
+                        View <i class="fas fa-arrow-right ml-1"></i>
+                    </a>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="4" class="px-6 py-8 text-center text-gray-500">
+                    No scans yet. Run your first scan to start tracking AEO visibility.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

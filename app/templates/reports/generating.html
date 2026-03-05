@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Generating Content - AEO Platform{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center">
+    <div class="text-center max-w-md">
+        <div class="mb-6">
+            <i class="fas fa-spinner fa-spin text-indigo-600 text-5xl"></i>
+        </div>
+        <h1 class="text-2xl font-bold text-gray-900 mb-2">Generating Content...</h1>
+        <p class="text-gray-600 mb-4">Our AI is researching and writing your article.</p>
+        <p class="text-sm text-gray-500 mb-8">This usually takes 30-60 seconds.</p>
+        
+        <div class="bg-white rounded-xl shadow-sm p-4 mb-6">
+            <p class="text-sm text-gray-600">Creating:</p>
+            <p class="font-medium text-gray-900">{{ suggestion.title }}</p>
+        </div>
+        
+        <div class="space-y-2">
+            <p class="text-sm text-gray-500">This page will refresh automatically when ready.</p>
+            <a href="{{ url_for('reports.suggestions') }}" class="text-indigo-600 hover:text-indigo-800 text-sm">
+                ← Back to suggestions
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-refresh every 5 seconds
+setInterval(function() {
+    window.location.reload();
+}, 5000);
+</script>
+{% endblock %}

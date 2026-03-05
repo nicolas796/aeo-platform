@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Content Suggestions - AEO Platform{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <h1 class="text-3xl font-bold text-gray-900">Content Suggestions</h1>
+    <p class="text-gray-600">AI-generated blog post ideas to improve AEO visibility</p>
+</div>
+
+<!-- Suggestions Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    {% for suggestion in suggestions %}
+    <div class="bg-white rounded-xl shadow-sm p-6">
+        <div class="flex justify-between items-start mb-4">
+            <div>
+                <span class="px-2 py-1 text-xs rounded-full 
+                    {% if suggestion.status == 'pending' %}bg-yellow-100 text-yellow-800
+                    {% elif suggestion.status == 'approved' %}bg-green-100 text-green-800
+                    {% elif suggestion.status == 'rejected' %}bg-red-100 text-red-800
+                    {% else %}bg-blue-100 text-blue-800{% endif %}">
+                    {{ suggestion.status.title() }}
+                </span>
+                <p class="text-xs text-gray-500 mt-1">For: {{ suggestion.keyword.prompt_text[:60] if suggestion.keyword else 'Unknown' }}...</p>
+            </div>
+        </div>
+        
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ suggestion.title }}</h3>
+        
+        <div class="mb-4">
+            <p class="text-sm text-gray-600"><strong>Target:</strong> {{ suggestion.target_word_count }} words</p>
+        </div>
+        
+        <div class="mb-4">
+            <p class="text-sm font-medium text-gray-700 mb-1">Unique Angle:</p>
+            <p class="text-sm text-gray-600">{{ suggestion.unique_angle }}</p>
+        </div>
+        
+        <div class="mb-4">
+            <p class="text-sm font-medium text-gray-700 mb-2">Outline:</p>
+            <ul class="text-sm text-gray-600 space-y-1">
+                {% for item in suggestion.get_outline() %}
+                <li><i class="fas fa-check text-green-500 mr-2"></i>{{ item.heading }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        
+        <div class="flex gap-2 mt-4">
+            {% if suggestion.status == 'pending' %}
+            <form method="POST" action="{{ url_for('reports.approve_suggestion', id=suggestion.id) }}" class="flex-1">
+                <button type="submit" class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 text-sm">
+                    <i class="fas fa-check mr-1"></i> Approve & Generate
+                </button>
+            </form>
+            <form method="POST" action="{{ url_for('reports.reject_suggestion', id=suggestion.id) }}" class="flex-1">
+                <button type="submit" class="w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 text-sm">
+                    <i class="fas fa-times mr-1"></i> Reject
+                </button>
+            </form>
+            {% elif suggestion.status == 'generating' %}
+            <a href="{{ url_for('reports.generating', id=suggestion.id) }}" class="flex-1 bg-yellow-600 text-white py-2 rounded-lg hover:bg-yellow-700 text-sm text-center">
+                <i class="fas fa-spinner fa-spin mr-1"></i> Generating...
+            </a>
+            {% elif suggestion.status == 'created' %}
+            {% set content = suggestion.generated_content %}
+            {% if content is iterable and content is not string %}
+                {% set content = content[0] if content else None %}
+            {% endif %}
+            {% if content %}
+            <a href="{{ url_for('reports.edit_content', id=content.id) }}" class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 text-sm text-center">
+                <i class="fas fa-edit mr-1"></i> Edit Content
+            </a>
+            {% else %}
+            <span class="flex-1 text-center text-gray-500 py-2">Content not found</span>
+            {% endif %}
+            {% else %}
+            <span class="flex-1 text-center text-gray-500 py-2">{{ suggestion.status.title() }}</span>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="col-span-2 text-center py-12">
+        <i class="fas fa-lightbulb text-gray-300 text-5xl mb-4"></i>
+        <p class="text-gray-500">No content suggestions yet. Run a scan to generate ideas!</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

@@ -60,11 +60,33 @@ class EmailService:
 
             html_content = "\n".join(body_lines)
 
+            # Build plain text version for deliverability
+            plain_lines = [
+                content.title,
+                "",
+                "Please review the attached content.",
+            ]
+            if message:
+                plain_lines.extend(["", f"Message: {message}"])
+            preview = content.content[:2000]
+            plain_lines.extend([
+                "",
+                f"Word Count: {content.word_count}",
+                f"SEO Keyphrase: {content.seo_keyphrase or 'N/A'}",
+                "",
+                "--- Content Preview ---",
+                preview,
+                "",
+                "Sent from AEO Platform",
+            ])
+            plain_text = "\n".join(plain_lines)
+
             # Create email
             mail = Mail(
                 from_email=self.from_email,
                 to_emails=to_email,
                 subject=subject,
+                plain_text_content=plain_text,
                 html_content=html_content
             )
 

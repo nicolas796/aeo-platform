@@ -1,7 +1,6 @@
 import requests
 import json
 import os
-import subprocess
 from typing import Dict, List
 from datetime import datetime
 from flask import current_app
@@ -298,8 +297,10 @@ Format with proper markdown (headings, bullet points, bold text)."""
         return ""
 
     def _generate_thumbnail(self, title: str, keyphrase: str, tenant_name: str) -> str:
-        """Generate a thumbnail image using Nano Banana"""
+        """Generate a branded thumbnail image"""
         try:
+            from PIL import Image, ImageDraw, ImageFont
+
             # Create thumbnails directory if it doesn't exist
             thumbnails_dir = os.path.join(os.getcwd(), 'app', 'static', 'thumbnails')
             os.makedirs(thumbnails_dir, exist_ok=True)
@@ -309,31 +310,74 @@ Format with proper markdown (headings, bullet points, bold text)."""
             filename = f"{timestamp}-thumbnail.png"
             filepath = os.path.join(thumbnails_dir, filename)
 
-            # Create image prompt
-            image_prompt = f"""A professional, modern blog thumbnail image for an article titled "{title}".
+            # Create 1200x630 image (standard OG image size)
+            width, height = 1200, 630
+            img = Image.new('RGB', (width, height), color='#4F46E5')
+            draw = ImageDraw.Draw(img)
 
-Key theme: {keyphrase}
-Brand: {tenant_name}
+            # Draw a gradient-like accent bar at the bottom
+            accent_height = 8
+            draw.rectangle([0, height - accent_height, width, height], fill='#818CF8')
 
-Style: Clean, professional, eye-catching. Use a modern flat design or subtle 3D elements. Include visual elements that represent the topic. Use a cohesive color palette (blues, whites, and one accent color). No text in the image. Suitable for a business blog header image."""
-
-            # Run nano-banana image generation
-            script_path = os.path.expanduser('~/.npm-global/lib/node_modules/openclaw/skills/nano-banana-pro/scripts/generate_image.py')
-
-            result = subprocess.run(
-                ['uv', 'run', script_path, '--prompt', image_prompt, '--filename', filepath, '--resolution', '1K'],
-                capture_output=True,
-                text=True,
-                timeout=120
+            # Draw a subtle lighter rectangle in the center area
+            margin = 60
+            draw.rectangle(
+                [margin, margin, width - margin, height - margin - accent_height],
+                fill='#4338CA',
+                outline='#6366F1',
+                width=2
             )
 
-            if result.returncode == 0:
-                print(f"Thumbnail generated: {filepath}")
-                # Return relative path for web access
-                return f"thumbnails/{filename}"
-            else:
-                print(f"Thumbnail generation failed: {result.stderr}")
-                return None
+            # Use default font (Pillow built-in) at different sizes
+            try:
+                title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 36)
+                keyphrase_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 22)
+                brand_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 18)
+            except (OSError, IOError):
+                title_font = ImageFont.load_default()
+                keyphrase_font = title_font
+                brand_font = title_font
+
+            # Word-wrap the title
+            inner_width = width - margin * 2 - 60
+            words = title.split()
+            lines = []
+            current_line = ""
+            for word in words:
+                test_line = f"{current_line} {word}".strip()
+                bbox = draw.textbbox((0, 0), test_line, font=title_font)
+                if bbox[2] - bbox[0] <= inner_width:
+                    current_line = test_line
+                else:
+                    if current_line:
+                        lines.append(current_line)
+                    current_line = word
+            if current_line:
+                lines.append(current_line)
+
+            # Draw title text (centered vertically)
+            line_height = 46
+            total_text_height = len(lines) * line_height + 60
+            y_start = (height - total_text_height) // 2
+
+            for i, line in enumerate(lines[:4]):  # Max 4 lines
+                bbox = draw.textbbox((0, 0), line, font=title_font)
+                text_width = bbox[2] - bbox[0]
+                x = (width - text_width) // 2
+                draw.text((x, y_start + i * line_height), line, fill='#FFFFFF', font=title_font)
+
+            # Draw keyphrase below title
+            keyphrase_y = y_start + len(lines[:4]) * line_height + 15
+            bbox = draw.textbbox((0, 0), keyphrase, font=keyphrase_font)
+            kp_width = bbox[2] - bbox[0]
+            draw.text(((width - kp_width) // 2, keyphrase_y), keyphrase, fill='#C7D2FE', font=keyphrase_font)
+
+            # Draw brand name at top
+            draw.text((margin + 20, margin + 15), tenant_name.upper(), fill='#A5B4FC', font=brand_font)
+
+            img.save(filepath, 'PNG')
+            print(f"Thumbnail generated: {filepath}")
+            return f"thumbnails/{filename}"
 
         except Exception as e:
             print(f"Thumbnail generation error: {e}")

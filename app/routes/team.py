@@ -71,7 +71,11 @@ def invite():
     
     # Send invitation email
     service = EmailService()
-    invite_url = url_for('team.accept_invite', token=token, _external=True)
+    app_url = current_app.config.get('APP_URL')
+    if app_url:
+        invite_url = f"{app_url}{url_for('team.accept_invite', token=token)}"
+    else:
+        invite_url = url_for('team.accept_invite', token=token, _external=True)
     success, error = service.send_invitation_email(email, current_user, invite_url)
     
     if success:

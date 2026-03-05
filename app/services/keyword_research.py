@@ -54,14 +54,14 @@ class KeywordResearchService:
         industry = tenant.industry or 'general'
         company_name = tenant.name
         
-        # Template-based keyword generation
+        # Template-based keyword generation - all include company_name
         templates = {
             'technology': [
-                f"What is {company_name} and what does it do?",
+                f"What is {company_name}?",
                 f"How does {company_name} work?",
                 f"{company_name} vs competitors",
-                f"Best {industry} solutions for small business",
-                f"How to choose {industry} software",
+                f"{company_name} for small business",
+                f"How to use {company_name}",
                 f"{company_name} pricing and plans",
                 f"Is {company_name} worth it?",
             ],

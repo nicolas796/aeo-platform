@@ -9,7 +9,7 @@ keywords_bp = Blueprint('keywords', __name__)
 @login_required
 def index():
     tenant_id = current_user.tenant_id
-    keywords = Keyword.query.filter_by(tenant_id=tenant_id).order_by(Keyword.priority_score.desc()).all()
+    keywords = Keyword.query.filter_by(tenant_id=tenant_id, active=True).order_by(Keyword.priority_score.desc()).all()
     return render_template('keywords/index.html', keywords=keywords)
 
 @keywords_bp.route('/add', methods=['POST'])

@@ -10,3 +10,5 @@ email-validator
 python-docx
 markdown
 sendgrid
+gunicorn
+psycopg2-binary

@@ -27,6 +27,7 @@ def create_app(config_name='default'):
     from app.routes.scans import scans_bp
     from app.routes.reports import reports_bp
     from app.routes.team import team_bp
+    from app.routes.credits import credits_bp
     
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -35,6 +36,7 @@ def create_app(config_name='default'):
     app.register_blueprint(scans_bp, url_prefix='/scans')
     app.register_blueprint(reports_bp, url_prefix='/reports')
     app.register_blueprint(team_bp, url_prefix='/team')
+    app.register_blueprint(credits_bp, url_prefix='/credits')
     
     # Create tables
     with app.app_context():

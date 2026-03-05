@@ -18,6 +18,25 @@ class AEOSCANNER:
         if not scan:
             return
         
+        # Check credits before starting
+        from app.services.credit_tracker import CreditTracker
+        keywords = Keyword.query.filter_by(tenant_id=scan.tenant_id, active=True).all()
+        estimated_cost = len(keywords) * CreditTracker.COSTS['scan_keyword']
+        
+        credit_check = CreditTracker.charge(
+            tenant_id=scan.tenant_id,
+            operation='scan_keyword',
+            quantity=len(keywords),
+            description=f'Scan {len(keywords)} keywords',
+            metadata={'scan_id': scan_id}
+        )
+        
+        if not credit_check['success']:
+            scan.status = 'failed'
+            scan.error_message = f'Insufficient credits: {credit_check["error"]}'
+            db.session.commit()
+            return
+        
         scan.status = 'running'
         db.session.commit()
         

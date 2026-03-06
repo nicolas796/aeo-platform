@@ -1,8 +1,7 @@
 """Email service for sending content via SendGrid"""
 import os
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
-import base64
+from sendgrid.helpers.mail import Mail
 from flask import current_app
 
 
@@ -19,15 +18,15 @@ class EmailService:
             print(f"EmailService initialized with API key: {self.api_key[:10]}...")
             print(f"From email: {self.from_email}")
 
-    def send_content_for_review(self, to_email, content, message=None, include_word=True, include_thumbnail=True):
-        """Send generated content to someone for review
+    def send_content_for_review(self, to_email, content, share_url, sender_name, message=None):
+        """Send a teaser email with a link to view shared content
 
         Args:
             to_email: Recipient email address
             content: GeneratedContent object
+            share_url: URL to view the full content
+            sender_name: Name of the person sharing
             message: Optional personal message
-            include_word: Whether to attach Word document
-            include_thumbnail: Whether to attach thumbnail image
 
         Returns:
             tuple: (success: bool, error_message: str or None)
@@ -36,52 +35,61 @@ class EmailService:
             return False, "SendGrid API key not configured"
 
         try:
-            # Build email subject
-            subject = f"[Review] {content.title}"
+            subject = f"{sender_name} shared \"{content.title}\" with you"
 
-            # Build email body
-            body_lines = [
-                f"<h2>{content.title}</h2>",
-                "<p>Please review the attached content.</p>"
-            ]
+            # Build a short content snippet (first 200 chars, no markdown)
+            import re
+            snippet = re.sub(r'[#*_\[\]()]', '', content.content[:200]).strip()
+            if len(content.content) > 200:
+                snippet += "..."
 
+            message_block_html = ""
+            message_block_text = ""
             if message:
-                body_lines.append(f"<p><strong>Message:</strong> {message}</p>")
+                from markupsafe import escape
+                message_block_html = f"""
+                <div style="margin: 20px 0; padding: 15px; background-color: #f9fafb; border-left: 4px solid #4F46E5; border-radius: 4px;">
+                    <p style="margin: 0; color: #374151; font-style: italic;">&ldquo;{escape(message)}&rdquo;</p>
+                </div>"""
+                message_block_text = f'\n"{message}"\n'
 
-            body_lines.extend([
-                f"<p><strong>Word Count:</strong> {content.word_count}</p>",
-                f"<p><strong>SEO Keyphrase:</strong> {content.seo_keyphrase or 'N/A'}</p>",
-                "<hr>",
-                "<h3>Content Preview:</h3>",
-                f"<pre style='white-space: pre-wrap; background: #f5f5f5; padding: 15px; border-radius: 5px;'>{content.content[:2000]}...</pre>" if len(content.content) > 2000 else f"<pre style='white-space: pre-wrap; background: #f5f5f5; padding: 15px; border-radius: 5px;'>{content.content}</pre>",
-                "<hr>",
-                "<p><em>Sent from AEO Platform</em></p>"
-            ])
+            html_content = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <p style="color: #374151;"><strong>{sender_name}</strong> shared content with you for review:</p>
 
-            html_content = "\n".join(body_lines)
+                <div style="margin: 20px 0; padding: 20px; background-color: #f3f4f6; border-radius: 8px;">
+                    <h2 style="margin: 0 0 8px 0; color: #111827; font-size: 20px;">{content.title}</h2>
+                    <p style="margin: 0 0 12px 0; color: #6b7280; font-size: 14px;">
+                        {content.word_count} words &middot; SEO Keyphrase: {content.seo_keyphrase or 'N/A'}
+                    </p>
+                    <p style="margin: 0; color: #4b5563; font-size: 14px;">{snippet}</p>
+                </div>
+                {message_block_html}
+                <div style="margin: 30px 0; text-align: center;">
+                    <a href="{share_url}" style="display: inline-block; padding: 14px 32px; background-color: #4F46E5; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: bold;">View Full Content</a>
+                </div>
 
-            # Build plain text version for deliverability
-            plain_lines = [
-                content.title,
-                "",
-                "Please review the attached content.",
-            ]
-            if message:
-                plain_lines.extend(["", f"Message: {message}"])
-            preview = content.content[:2000]
-            plain_lines.extend([
-                "",
-                f"Word Count: {content.word_count}",
-                f"SEO Keyphrase: {content.seo_keyphrase or 'N/A'}",
-                "",
-                "--- Content Preview ---",
-                preview,
-                "",
-                "Sent from AEO Platform",
-            ])
-            plain_text = "\n".join(plain_lines)
+                <p style="color: #9ca3af; font-size: 12px; text-align: center;">
+                    This link expires in 30 days.<br>
+                    Sent from AEO Platform
+                </p>
+            </div>
+            """
 
-            # Create email
+            plain_text = f"""{sender_name} shared content with you for review:
+
+"{content.title}"
+{content.word_count} words | SEO Keyphrase: {content.seo_keyphrase or 'N/A'}
+
+{snippet}
+{message_block_text}
+View the full content and download options here:
+{share_url}
+
+This link expires in 30 days.
+Sent from AEO Platform
+"""
+
             mail = Mail(
                 from_email=self.from_email,
                 to_emails=to_email,
@@ -90,94 +98,9 @@ class EmailService:
                 html_content=html_content
             )
 
-            # Attach Word document if requested
-            if include_word:
-                from docx import Document
-                from docx.shared import Pt, RGBColor
-                from docx.enum.text import WD_ALIGN_PARAGRAPH
-                import io
-                import re
-
-                doc = Document()
-
-                # Add title
-                title = doc.add_heading(content.title, level=1)
-                title.alignment = WD_ALIGN_PARAGRAPH.LEFT
-
-                # Add content
-                lines = content.content.split('\n')
-                for line in lines:
-                    line = line.strip()
-                    if not line:
-                        continue
-
-                    if line.startswith('# '):
-                        doc.add_heading(line[2:], level=1)
-                    elif line.startswith('## '):
-                        doc.add_heading(line[3:], level=2)
-                    elif line.startswith('### '):
-                        doc.add_heading(line[4:], level=3)
-                    elif line.startswith('- ') or line.startswith('* '):
-                        doc.add_paragraph(line[2:], style='List Bullet')
-                    elif re.match(r'^\d+\.\s', line):
-                        text = re.sub(r'^\d+\.\s', '', line)
-                        doc.add_paragraph(text, style='List Number')
-                    else:
-                        p = doc.add_paragraph()
-                        parts = re.split(r'(\*\*.*?\*\*|\*.*?\*|__.*?__|_.*?_)', line)
-                        for part in parts:
-                            if part.startswith('**') and part.endswith('**'):
-                                run = p.add_run(part[2:-2])
-                                run.bold = True
-                            elif part.startswith('*') and part.endswith('*'):
-                                run = p.add_run(part[1:-1])
-                                run.italic = True
-                            elif part.startswith('__') and part.endswith('__'):
-                                run = p.add_run(part[2:-2])
-                                run.bold = True
-                            elif part.startswith('_') and part.endswith('_'):
-                                run = p.add_run(part[1:-1])
-                                run.italic = True
-                            else:
-                                p.add_run(part)
-
-                # Save to buffer
-                buffer = io.BytesIO()
-                doc.save(buffer)
-                buffer.seek(0)
-
-                # Attach
-                filename = re.sub(r'[^\w\s-]', '', content.title).strip().replace(' ', '_') + '.docx'
-                encoded = base64.b64encode(buffer.read()).decode()
-
-                attachment = Attachment()
-                attachment.file_content = FileContent(encoded)
-                attachment.file_name = FileName(filename)
-                attachment.file_type = FileType('application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-                attachment.disposition = Disposition('attachment')
-                mail.add_attachment(attachment)
-
-            # Attach thumbnail if requested and exists
-            if include_thumbnail and content.thumbnail_path:
-                import os
-                thumbnail_full_path = os.path.join(current_app.root_path, 'static', content.thumbnail_path)
-                if os.path.exists(thumbnail_full_path):
-                    with open(thumbnail_full_path, 'rb') as f:
-                        thumbnail_data = f.read()
-
-                    encoded_thumb = base64.b64encode(thumbnail_data).decode()
-                    thumb_attachment = Attachment()
-                    thumb_attachment.file_content = FileContent(encoded_thumb)
-                    thumb_attachment.file_name = FileName('thumbnail.png')
-                    thumb_attachment.file_type = FileType('image/png')
-                    thumb_attachment.disposition = Disposition('attachment')
-                    mail.add_attachment(thumb_attachment)
-
-            # Send email
             response = self.client.send(mail)
 
             print(f"SendGrid response status: {response.status_code}")
-            print(f"SendGrid response body: {response.body}")
 
             if response.status_code in [200, 201, 202]:
                 return True, None
@@ -188,8 +111,7 @@ class EmailService:
             import traceback
             print(f"SendGrid error: {e}")
             print(traceback.format_exc())
-            error_msg = self._extract_error(e)
-            return False, error_msg
+            return False, self._extract_error(e)
 
     def send_invitation_email(self, to_email, inviter, invite_url):
         """Send team invitation email

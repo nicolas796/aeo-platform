@@ -340,3 +340,70 @@ def view_shared_content(token):
 
     return render_template('reports/shared_content.html',
                            content=content, html_body=html_body, share=share)
+
+
+@reports_bp.route('/shared/<token>/download')
+def export_shared_word(token):
+    """Download Word document for shared content (no login required)"""
+    share = ContentShare.query.filter_by(token=token).first()
+
+    if not share or share.is_expired():
+        flash('This share link is invalid or has expired.', 'error')
+        return redirect(url_for('auth.login'))
+
+    content = share.content
+
+    doc = Document()
+    title = doc.add_heading(content.title, level=1)
+    title.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+    if content.meta_description:
+        meta = doc.add_paragraph()
+        meta_run = meta.add_run(f"Meta Description: {content.meta_description}")
+        meta_run.italic = True
+        meta_run.font.size = Pt(10)
+        meta_run.font.color.rgb = RGBColor(128, 128, 128)
+        doc.add_paragraph()
+
+    for line in content.content.split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith('# '):
+            doc.add_heading(line[2:], level=1)
+        elif line.startswith('## '):
+            doc.add_heading(line[3:], level=2)
+        elif line.startswith('### '):
+            doc.add_heading(line[4:], level=3)
+        elif line.startswith('#### '):
+            doc.add_heading(line[5:], level=4)
+        elif line.startswith('- ') or line.startswith('* '):
+            doc.add_paragraph(line[2:], style='List Bullet')
+        elif re.match(r'^\d+\.\s', line):
+            text = re.sub(r'^\d+\.\s', '', line)
+            doc.add_paragraph(text, style='List Number')
+        else:
+            p = doc.add_paragraph()
+            parts = re.split(r'(\*\*.*?\*\*|\*.*?\*)', line)
+            for part in parts:
+                if part.startswith('**') and part.endswith('**'):
+                    run = p.add_run(part[2:-2])
+                    run.bold = True
+                elif part.startswith('*') and part.endswith('*'):
+                    run = p.add_run(part[1:-1])
+                    run.italic = True
+                else:
+                    p.add_run(part)
+
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+
+    filename = re.sub(r'[^\w\s-]', '', content.title).strip().replace(' ', '_') + '.docx'
+
+    return send_file(
+        buffer,
+        mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        as_attachment=True,
+        download_name=filename
+    )

@@ -35,6 +35,8 @@ class EmailService:
             return False, "SendGrid API key not configured"
 
         try:
+            from markupsafe import escape
+
             subject = f"{sender_name} shared \"{content.title}\" with you"
 
             # Build a short content snippet (first 200 chars, no markdown)
@@ -43,10 +45,15 @@ class EmailService:
             if len(content.content) > 200:
                 snippet += "..."
 
+            # Escape user-controlled values for HTML
+            safe_sender = escape(sender_name)
+            safe_title = escape(content.title)
+            safe_snippet = escape(snippet)
+            safe_keyphrase = escape(content.seo_keyphrase or 'N/A')
+
             message_block_html = ""
             message_block_text = ""
             if message:
-                from markupsafe import escape
                 message_block_html = f"""
                 <div style="margin: 20px 0; padding: 15px; background-color: #f9fafb; border-left: 4px solid #4F46E5; border-radius: 4px;">
                     <p style="margin: 0; color: #374151; font-style: italic;">&ldquo;{escape(message)}&rdquo;</p>
@@ -55,14 +62,14 @@ class EmailService:
 
             html_content = f"""
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <p style="color: #374151;"><strong>{sender_name}</strong> shared content with you for review:</p>
+                <p style="color: #374151;"><strong>{safe_sender}</strong> shared content with you for review:</p>
 
                 <div style="margin: 20px 0; padding: 20px; background-color: #f3f4f6; border-radius: 8px;">
-                    <h2 style="margin: 0 0 8px 0; color: #111827; font-size: 20px;">{content.title}</h2>
+                    <h2 style="margin: 0 0 8px 0; color: #111827; font-size: 20px;">{safe_title}</h2>
                     <p style="margin: 0 0 12px 0; color: #6b7280; font-size: 14px;">
-                        {content.word_count} words &middot; SEO Keyphrase: {content.seo_keyphrase or 'N/A'}
+                        {content.word_count} words &middot; SEO Keyphrase: {safe_keyphrase}
                     </p>
-                    <p style="margin: 0; color: #4b5563; font-size: 14px;">{snippet}</p>
+                    <p style="margin: 0; color: #4b5563; font-size: 14px;">{safe_snippet}</p>
                 </div>
                 {message_block_html}
                 <div style="margin: 30px 0; text-align: center;">

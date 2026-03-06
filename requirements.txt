@@ -9,6 +9,7 @@ python-dotenv
 email-validator
 python-docx
 markdown
+bleach
 sendgrid
 Pillow
 gunicorn

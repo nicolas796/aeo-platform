@@ -113,6 +113,148 @@ Sent from AEO Platform
             print(traceback.format_exc())
             return False, self._extract_error(e)
 
+    def send_weekly_report_email(self, to_email, user, report, content_suggestions, dashboard_url):
+        """Send weekly AEO report to team member
+        
+        Args:
+            to_email: Recipient email
+            user: User object
+            report: WeeklyReport object
+            content_suggestions: List of ContentSuggestion objects
+            dashboard_url: URL to dashboard
+            
+        Returns:
+            tuple: (success: bool, error_message: str or None)
+        """
+        if not self.client:
+            return False, "SendGrid API key not configured"
+        
+        try:
+            tenant = user.tenant
+            subject = f"📊 Your Weekly AEO Report for {tenant.name}"
+            
+            # Calculate visibility score (average of mention and citation rates)
+            visibility_score = (report.mention_rate + report.citation_rate) / 2
+            
+            # Format change indicators
+            mention_change_emoji = "📈" if report.mention_rate_change > 0 else "📉" if report.mention_rate_change < 0 else "➡️"
+            citation_change_emoji = "📈" if report.citation_rate_change > 0 else "📉" if report.citation_rate_change < 0 else "➡️"
+            
+            mention_change_text = f"+{report.mention_rate_change:.1f}%" if report.mention_rate_change > 0 else f"{report.mention_rate_change:.1f}%"
+            citation_change_text = f"+{report.citation_rate_change:.1f}%" if report.citation_rate_change > 0 else f"{report.citation_rate_change:.1f}%"
+            
+            # Build content suggestions teaser
+            suggestions_html = ""
+            if content_suggestions:
+                suggestions_html = "<h3 style='color: #4F46E5; margin-top: 30px;'>💡 Content Suggestions</h3><ul style='padding-left: 20px;'>"
+                for suggestion in content_suggestions[:3]:
+                    suggestions_html += f"<li style='margin-bottom: 10px;'><strong>{suggestion.title}</strong><br><span style='color: #666; font-size: 14px;'>{suggestion.unique_angle[:100]}...</span></li>"
+                suggestions_html += "</ul>"
+            
+            # Build recommendations
+            recommendations_html = ""
+            recommendations = report.get_recommendations()
+            if recommendations:
+                recommendations_html = "<h3 style='color: #4F46E5; margin-top: 30px;'>🎯 Recommendations</h3><ul style='padding-left: 20px;'>"
+                for rec in recommendations[:3]:
+                    recommendations_html += f"<li style='margin-bottom: 8px;'>{rec}</li>"
+                recommendations_html += "</ul>"
+            
+            html_content = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                <div style="background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); padding: 30px; text-align: center; color: white;">
+                    <h1 style="margin: 0; font-size: 24px;">📊 Weekly AEO Report</h1>
+                    <p style="margin: 10px 0 0 0; opacity: 0.9;">{tenant.name}</p>
+                    <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.8;">{report.report_date.strftime('%B %d, %Y')}</p>
+                </div>
+                
+                <div style="padding: 30px; background: #fff;">
+                    <p style="font-size: 16px;">Hi {user.first_name or 'there'},</p>
+                    <p>Here's how <strong>{tenant.name}</strong> performed in AI search visibility this week:</p>
+                    
+                    <!-- Metrics Grid -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 25px 0;">
+                        <!-- Mention Rate -->
+                        <div style="background: #F3F4F6; padding: 20px; border-radius: 8px; text-align: center;">
+                            <p style="margin: 0; color: #6B7280; font-size: 14px;">Mention Rate</p>
+                            <p style="margin: 5px 0; font-size: 32px; font-weight: bold; color: #4F46E5;">{report.mention_rate:.1f}%</p>
+                            <p style="margin: 0; font-size: 14px;">{mention_change_emoji} {mention_change_text} from last week</p>
+                        </div>
+                        
+                        <!-- Citation Rate -->
+                        <div style="background: #F3F4F6; padding: 20px; border-radius: 8px; text-align: center;">
+                            <p style="margin: 0; color: #6B7280; font-size: 14px;">Citation Rate</p>
+                            <p style="margin: 5px 0; font-size: 32px; font-weight: bold; color: #10B981;">{report.citation_rate:.1f}%</p>
+                            <p style="margin: 0; font-size: 14px;">{citation_change_emoji} {citation_change_text} from last week</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Visibility Score -->
+                    <div style="background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); padding: 20px; border-radius: 8px; text-align: center; color: white; margin: 20px 0;">
+                        <p style="margin: 0; opacity: 0.9; font-size: 14px;">Overall Visibility Score</p>
+                        <p style="margin: 5px 0; font-size: 36px; font-weight: bold;">{visibility_score:.1f}%</p>
+                        <p style="margin: 0; opacity: 0.8; font-size: 14px;">Average of Mention & Citation Rates</p>
+                    </div>
+                    
+                    {recommendations_html}
+                    
+                    {suggestions_html}
+                    
+                    <!-- CTA Buttons -->
+                    <div style="margin-top: 30px; text-align: center;">
+                        <a href="{dashboard_url}" style="display: inline-block; background: #4F46E5; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 5px;">View Dashboard</a>
+                        <a href="{dashboard_url}/reports" style="display: inline-block; background: #10B981; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 5px;">Full Report</a>
+                        <a href="{dashboard_url}/reports/suggestions" style="display: inline-block; background: #F59E0B; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 5px;">Content Ideas</a>
+                    </div>
+                </div>
+                
+                <div style="padding: 20px; background: #F9FAFB; text-align: center; font-size: 12px; color: #6B7280;">
+                    <p>You're receiving this because you're a team member of {tenant.name} on AEO Platform.</p>
+                    <p style="margin: 5px 0;">This is an automated weekly report.</p>
+                </div>
+            </div>
+            """
+            
+            # Plain text version
+            plain_text = f"""Weekly AEO Report for {tenant.name}
+
+Hi {user.first_name or 'there'},
+
+Here's how {tenant.name} performed this week:
+
+MENTION RATE: {report.mention_rate:.1f}% ({mention_change_text} from last week)
+CITATION RATE: {report.citation_rate:.1f}% ({citation_change_text} from last week)
+VISIBILITY SCORE: {visibility_score:.1f}%
+
+View your full report: {dashboard_url}
+
+---
+AEO Platform
+"""
+            
+            from sendgrid.helpers.mail import Content
+            
+            mail = Mail(
+                from_email=self.from_email,
+                to_emails=to_email,
+                subject=subject,
+                plain_text_content=plain_text,
+                html_content=html_content
+            )
+            
+            response = self.client.send(mail)
+            
+            if response.status_code in [200, 201, 202]:
+                return True, None
+            else:
+                return False, f"SendGrid returned status {response.status_code}"
+                
+        except Exception as e:
+            import traceback
+            print(f"Weekly report email error: {e}")
+            print(traceback.format_exc())
+            return False, str(e)
+
     def send_invitation_email(self, to_email, inviter, invite_url):
         """Send team invitation email
 

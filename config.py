@@ -17,7 +17,7 @@ class Config:
     SENDGRID_FROM_EMAIL = os.environ.get('SENDGRID_FROM_EMAIL', 'noreply@aeoplatform.local')
     
     # Application URL (used for generating email links)
-    APP_URL = os.environ.get('APP_URL', '').strip().rstrip('/')
+    BASE_URL = os.environ.get('BASE_URL') or os.environ.get('APP_URL', 'https://aeo-platform.onrender.com')
 
     # Scheduling
     WEEKLY_SCAN_DAY = os.environ.get('WEEKLY_SCAN_DAY', 'sunday')  # Day to run weekly scans

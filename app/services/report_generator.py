@@ -113,6 +113,9 @@ class ReportGenerator:
         # Generate content suggestions for high-opportunity keywords
         self._generate_content_suggestions(tenant_id, needing_attention)
         
+        # Send weekly report email to all team members
+        self._send_report_to_team(tenant_id, report)
+        
         return report
     
     def _generate_recommendations(self, mention_rate: float, citation_rate: float, 
@@ -236,3 +239,49 @@ class ReportGenerator:
         
         db.session.commit()
         print(f"Generated {generated} fresh content suggestions based on scan results")
+
+    def _send_report_to_team(self, tenant_id: int, report: WeeklyReport):
+        """Send weekly report email to all active team members"""
+        from app.models import User, ContentSuggestion
+        from app.services.email_service import EmailService
+        from flask import current_app
+        
+        # Get all active users in the tenant
+        users = User.query.filter_by(tenant_id=tenant_id, active=True).all()
+        
+        if not users:
+            print(f"No active users found for tenant {tenant_id}, skipping email")
+            return
+        
+        # Get pending content suggestions
+        suggestions = ContentSuggestion.query.filter_by(
+            tenant_id=tenant_id,
+            status='pending'
+        ).order_by(ContentSuggestion.created_at.desc()).limit(5).all()
+        
+        # Build dashboard URL
+        dashboard_url = current_app.config.get('BASE_URL', 'https://aeo-platform.onrender.com')
+        
+        # Send email to each team member
+        email_service = EmailService()
+        sent_count = 0
+        
+        for user in users:
+            if not user.email:
+                continue
+                
+            success, error = email_service.send_weekly_report_email(
+                to_email=user.email,
+                user=user,
+                report=report,
+                content_suggestions=suggestions,
+                dashboard_url=dashboard_url
+            )
+            
+            if success:
+                sent_count += 1
+                print(f"Weekly report sent to {user.email}")
+            else:
+                print(f"Failed to send to {user.email}: {error}")
+        
+        print(f"Weekly report sent to {sent_count}/{len(users)} team members")

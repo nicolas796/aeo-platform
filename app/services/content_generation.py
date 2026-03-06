@@ -4,7 +4,7 @@ import os
 from typing import Dict, List
 from datetime import datetime
 from flask import current_app
-from app.models import db, ContentSuggestion, GeneratedContent
+from app.models import db, ContentSuggestion, GeneratedContent, BrandSoul
 
 class ContentGenerationService:
     """Generate AEO-optimized content from approved suggestions"""
@@ -22,6 +22,11 @@ class ContentGenerationService:
         # Get the keyword/prompt this content is for
         keyword = suggestion.keyword
         tenant = suggestion.tenant
+
+        brand_soul = BrandSoul.query.filter_by(tenant_id=tenant.id).first()
+        brand_soul_text = (brand_soul.brand_soul_content if brand_soul and brand_soul.brand_soul_content else '').strip()
+        icp_profile = brand_soul.get_icp_data() if brand_soul else {}
+
 
         # Step 1: Research what AI currently cites for this prompt
         research = self._research_landscape(keyword.prompt_text)
@@ -44,7 +49,9 @@ class ContentGenerationService:
             research=research,
             seo_keyphrase=seo_data['keyphrase'],
             internal_links=seo_data['internal_links'],
-            external_links=seo_data['external_links']
+            external_links=seo_data['external_links'],
+            brand_soul_text=brand_soul_text,
+            icp_profile=icp_profile
         )
 
         # Step 4: Generate thumbnail image
@@ -204,7 +211,8 @@ Return ONLY valid JSON in this exact format:
     def _write_article(self, prompt: str, brand_name: str, brand_website: str,
                        title: str, outline: List[Dict], unique_angle: str,
                        research: Dict, seo_keyphrase: str,
-                       internal_links: List[Dict], external_links: List[Dict]) -> Dict:
+                       internal_links: List[Dict], external_links: List[Dict],
+                       brand_soul_text: str = '', icp_profile: Dict = None) -> Dict:
         """Write the full AEO-optimized article"""
 
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={self.gemini_api_key}"
@@ -224,6 +232,11 @@ Return ONLY valid JSON in this exact format:
             for link in external_links[:2]
         ]) if external_links else "- Include 1-2 authoritative external citations"
 
+        brand_voice_text = brand_soul_text.strip() if brand_soul_text else (
+            f"Voice: Confident, data-backed, and practical. Spotlight why {brand_name} is trustworthy and indispensable."
+        )
+        audience_context = self._format_icp_context(icp_profile or {}, brand_name)
+
         article_prompt = f"""Write an AEO-optimized blog post that answers: "{prompt}"
 
 Title: {title}
@@ -235,6 +248,11 @@ Outline to follow:
 {outline_text}
 
 Brand: {brand_name} ({brand_website})
+Brand Soul Guidance:
+{brand_voice_text}
+
+Audience Notes:
+{audience_context}
 
 REQUIRED INTERNAL LINKS (integrate naturally):
 {internal_links_text}
@@ -283,6 +301,25 @@ Format with proper markdown (headings, bullet points, bold text)."""
             'content': f"# {title}\n\nContent generation failed. Please try again.",
             'meta_description': ''
         }
+
+    def _format_icp_context(self, icp_profile: Dict, brand_name: str) -> str:
+        labels = {
+            'who_for': 'Audience',
+            'problems_solved': 'Problems solved',
+            'customer_profile': 'Customer profile',
+            'needs': 'Needs & proof',
+            'aspirations': 'Aspirations'
+        }
+        lines = []
+        for key, label in labels.items():
+            value = icp_profile.get(key)
+            if value:
+                lines.append(f"{label}: {value}")
+        if not lines:
+            lines.append(
+                f"Audience: Decision makers evaluating {brand_name} and similar solutions. Focus on outcomes, proof, and low-risk adoption steps."
+            )
+        return "\n".join(lines)
 
     def _generate_meta_description(self, content: str) -> str:
         """Generate a 150-160 character meta description"""

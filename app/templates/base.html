@@ -40,6 +40,10 @@
                         <i class="fas fa-chart-line w-5 mr-3"></i>
                         Dashboard
                     </a>
+                    <a href="{{ url_for('brand_soul.index') }}" class="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg {% if request.endpoint and request.endpoint.startswith('brand_soul') %}bg-indigo-50 text-indigo-700{% endif %}">
+                        <i class="fas fa-heart w-5 mr-3"></i>
+                        Brand Soul
+                    </a>
                     <a href="{{ url_for('keywords.index') }}" class="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg {% if request.endpoint.startswith('keywords') %}bg-indigo-50 text-indigo-700{% endif %}">
                         <i class="fas fa-key w-5 mr-3"></i>
                         Keywords

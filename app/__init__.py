@@ -28,6 +28,7 @@ def create_app(config_name='default'):
     from app.routes.reports import reports_bp
     from app.routes.team import team_bp
     from app.routes.credits import credits_bp
+    from app.routes.brand_soul import brand_soul_bp
     
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -37,6 +38,7 @@ def create_app(config_name='default'):
     app.register_blueprint(reports_bp, url_prefix='/reports')
     app.register_blueprint(team_bp, url_prefix='/team')
     app.register_blueprint(credits_bp, url_prefix='/credits')
+    app.register_blueprint(brand_soul_bp, url_prefix='/brand-soul')
     
     # Create tables
     with app.app_context():

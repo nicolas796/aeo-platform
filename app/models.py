@@ -27,6 +27,7 @@ class Tenant(db.Model):
     scans = db.relationship('Scan', backref='tenant', lazy='dynamic')
     reports = db.relationship('WeeklyReport', backref='tenant', lazy='dynamic')
     content_suggestions = db.relationship('ContentSuggestion', backref='tenant', lazy='dynamic')
+    brand_soul = db.relationship('BrandSoul', backref='tenant', uselist=False)
     
     def __repr__(self):
         return f'<Tenant {self.name}>'
@@ -420,6 +421,51 @@ class ContentShare(db.Model):
 
     def is_expired(self):
         return datetime.utcnow() > self.expires_at
+
+
+class BrandSoul(db.Model):
+    """Brand voice + ICP research snapshot"""
+    __tablename__ = 'brand_souls'
+
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenants.id'), nullable=False, unique=True)
+
+    brand_soul_content = db.Column(db.Text)
+    icp_research = db.Column(db.Text)  # Stored as JSON
+    social_media_analyzed = db.Column(db.Text)  # JSON array
+    website_content_analyzed = db.Column(db.Text)  # JSON array
+    last_analyzed_at = db.Column(db.DateTime)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def get_icp_data(self):
+        default = {
+            'who_for': '',
+            'problems_solved': '',
+            'customer_profile': '',
+            'needs': '',
+            'aspirations': ''
+        }
+        if not self.icp_research:
+            return default
+        try:
+            data = json.loads(self.icp_research)
+            return {**default, **data}
+        except (ValueError, TypeError):
+            return default
+
+    def get_social_media(self):
+        try:
+            return json.loads(self.social_media_analyzed) if self.social_media_analyzed else []
+        except (ValueError, TypeError):
+            return []
+
+    def get_website_sections(self):
+        try:
+            return json.loads(self.website_content_analyzed) if self.website_content_analyzed else []
+        except (ValueError, TypeError):
+            return []
 
 
 class CreditBalance(db.Model):

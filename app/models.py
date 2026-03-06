@@ -403,10 +403,29 @@ class Invitation(db.Model):
         return f'<Invitation {self.email} - {self.status}>'
 
 
+class ContentShare(db.Model):
+    """Shareable links for generated content"""
+    __tablename__ = 'content_shares'
+
+    id = db.Column(db.Integer, primary_key=True)
+    content_id = db.Column(db.Integer, db.ForeignKey('generated_content.id'), nullable=False)
+    shared_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    token = db.Column(db.String(100), unique=True, nullable=False)
+    recipient_email = db.Column(db.String(120))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=False)
+
+    content = db.relationship('GeneratedContent', backref='shares')
+    sharer = db.relationship('User', foreign_keys=[shared_by])
+
+    def is_expired(self):
+        return datetime.utcnow() > self.expires_at
+
+
 class CreditBalance(db.Model):
     """Credit balance tracking per tenant"""
     __tablename__ = 'credit_balances'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, db.ForeignKey('tenants.id'), nullable=False, unique=True)
     credits_total = db.Column(db.Integer, default=0)
@@ -415,10 +434,10 @@ class CreditBalance(db.Model):
     billing_cycle_start = db.Column(db.DateTime)
     billing_cycle_end = db.Column(db.DateTime)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+
     # Relationships
     tenant = db.relationship('Tenant', backref='credit_balance', uselist=False)
-    
+
     def __repr__(self):
         return f'<CreditBalance {self.tenant.name}: {self.credits_remaining}>'
 
@@ -426,7 +445,7 @@ class CreditBalance(db.Model):
 class CreditTransaction(db.Model):
     """Individual credit transactions"""
     __tablename__ = 'credit_transactions'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     tenant_id = db.Column(db.Integer, db.ForeignKey('tenants.id'), nullable=False)
     operation = db.Column(db.String(50), nullable=False)  # scan_keyword, content_generate, etc.
@@ -437,10 +456,10 @@ class CreditTransaction(db.Model):
     meta_data = db.Column(db.Text)  # JSON string for extra data
     balance_after = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     # Relationships
     tenant = db.relationship('Tenant', backref='credit_transactions')
-    
+
     def to_dict(self):
         import json
         return {
@@ -453,6 +472,6 @@ class CreditTransaction(db.Model):
             'balance_after': self.balance_after,
             'created_at': self.created_at.isoformat()
         }
-    
+
     def __repr__(self):
         return f'<CreditTransaction {self.operation}: {self.total_cost}>'

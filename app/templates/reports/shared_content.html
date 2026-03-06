@@ -2,7 +2,7 @@
 
 {% block title %}{{ content.title }} - AEO Platform{% endblock %}
 
-{% block auth_content %}
+{% block content %}{% block auth_content %}
 <div class="w-full max-w-4xl mx-auto py-8 px-4">
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
@@ -67,4 +67,4 @@
         Shared via AEO Platform &middot; Link expires {{ share.expires_at.strftime('%B %d, %Y') }}
     </p>
 </div>
-{% endblock %}
+{% endblock auth_content %}{% endblock content %}

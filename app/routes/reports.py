@@ -336,7 +336,18 @@ def view_shared_content(token):
         return redirect(url_for('auth.login'))
 
     content = share.content
-    html_body = markdown.markdown(content.content, extensions=['tables', 'fenced_code'])
+    import bleach
+    raw_html = markdown.markdown(content.content, extensions=['tables', 'fenced_code'])
+    allowed_tags = list(bleach.ALLOWED_TAGS) + [
+        'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'br', 'hr',
+        'pre', 'code', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
+        'ul', 'ol', 'li', 'img', 'div', 'span', 'strong', 'em',
+    ]
+    allowed_attrs = dict(bleach.ALLOWED_ATTRIBUTES)
+    allowed_attrs['img'] = ['src', 'alt', 'title']
+    allowed_attrs['td'] = ['align']
+    allowed_attrs['th'] = ['align']
+    html_body = bleach.clean(raw_html, tags=allowed_tags, attributes=allowed_attrs)
 
     return render_template('reports/shared_content.html',
                            content=content, html_body=html_body, share=share)
